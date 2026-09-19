@@ -1,19 +1,13 @@
-import { loadEnvConfig } from "@next/env";
+import { config } from "dotenv";
 import { defineConfig } from "drizzle-kit";
 
-loadEnvConfig(process.cwd());
-
-const databaseUrl = process.env.DIRECT_URL ?? process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("Missing DATABASE_URL (or DIRECT_URL) environment variable");
-}
+config({ path: ".env.local" });
 
 export default defineConfig({
-  out: "./drizzle",
   schema: "./lib/db/schema.ts",
+  out: "./lib/db/migrations",
   dialect: "postgresql",
   dbCredentials: {
-    url: databaseUrl,
+    url: process.env.DATABASE_URL!,
   },
 });

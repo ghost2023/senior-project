@@ -1,16 +1,10 @@
-import "server-only";
-
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
-
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
 import * as schema from "./schema";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error("Missing DATABASE_URL environment variable");
-}
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
 
-// `prepare: false` is required for Supabase's transaction pooler (pgbouncer),
-// which doesn't support prepared statements.
-const client = postgres(process.env.DATABASE_URL, { prepare: false });
-
-export const db = drizzle(client, { schema });
+export const db = drizzle(pool, { schema });
+export type Db = typeof db;
