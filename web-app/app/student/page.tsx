@@ -1,274 +1,267 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import {
-  IconAward,
-  IconCalendar,
-  IconBook,
-  IconTrendingUp,
-  IconAlertCircle,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   IconSparkles,
-  IconClock,
-  IconCircleCheck,
+  IconAlertTriangle,
+  IconTrendingUp,
+  IconCalendar,
+  IconCreditCard,
+  IconMicroscope,
 } from "@tabler/icons-react";
+import { getSession } from "@/lib/permissions";
+import {
+  getAttendanceStats,
+  getLatestRiskAssessment,
+  getStudentAlerts,
+  getStudentByUserId,
+  getStudentEnrollments,
+} from "@/lib/queries/student";
+import { cn } from "@/lib/utils";
+import { GpaTrendChart } from "./gpa-trend-chart";
 
-export default function StudentDashboardPage() {
-  const currentCourses = [
-    {
-      code: "CS301",
-      name: "Advanced Algorithms",
-      credits: 4,
-      instructor: "Dr. Amanda Reyes",
-      grade: "A-",
-      attendance: 94,
-      nextAssessment: "Midterm Exam (in 5 days)",
-      status: "good",
-    },
-    {
-      code: "CS302",
-      name: "Database Systems",
-      credits: 3,
-      instructor: "Dr. Amanda Reyes",
-      grade: "B+",
-      attendance: 91,
-      nextAssessment: "Project Milestone 2 (in 8 days)",
-      status: "good",
-    },
-    {
-      code: "CS303",
-      name: "Operating Systems",
-      credits: 4,
-      instructor: "Mr. Samuel Okafor",
-      grade: "B",
-      attendance: 88,
-      nextAssessment: "Kernel Lab 3 (in 3 days)",
-      status: "warning",
-    },
-    {
-      code: "MATH301",
-      name: "Probability and Statistics",
-      credits: 3,
-      instructor: "Dr. Kevin Miller",
-      grade: "A",
-      attendance: 97,
-      nextAssessment: "Quiz 4 (in 12 days)",
-      status: "good",
-    },
-  ];
+const STANDING_THRESHOLDS = [
+  { min: 3.5, label: "Distinguished" },
+  { min: 3.0, label: "Good Standing" },
+  { min: 2.0, label: "Satisfactory" },
+  { min: 0, label: "Probation" },
+];
 
-  const recentRecommendations = [
-    {
-      title: "Operating Systems Lab Practice",
-      source: "Predictive Analytics Agent",
-      message: "Scores on memory paging assignments suggest practicing threading and deadlock labs before the upcoming midterm.",
-      severity: "medium",
-    },
-    {
-      title: "High Attendance Streak in MATH301",
-      source: "Academic Tracking System",
-      message: "Excellent consistency! Your 97% attendance correlates with a 92% historical probability of an 'A' grade.",
-      severity: "low",
-    },
-  ];
+function standingFor(gpa: number) {
+  return STANDING_THRESHOLDS.find((t) => gpa >= t.min)?.label ?? "Probation";
+}
+
+export default async function StudentDashboardPage() {
+  const session = await getSession();
+  const student = await getStudentByUserId(session!.user.id);
+  if (!student) return <div>No student profile found for this account.</div>;
+
+  const enrollments = await getStudentEnrollments(student.id);
+  const attendance = await getAttendanceStats(enrollments.map((e) => e.id));
+  const latestRisk = await getLatestRiskAssessment(student.id);
+  const alerts = await getStudentAlerts(student.id);
+  const activeAlerts = alerts.filter((a) => !a.acknowledgedAt);
+
+  const graded = enrollments.filter((e) => e.finalGrade?.gpaPoints != null);
+  const totalCredits = graded.reduce((s, e) => s + e.section.course.credits, 0);
+  const gpa =
+    totalCredits > 0
+      ? graded.reduce((s, e) => s + Number(e.finalGrade!.gpaPoints) * e.section.course.credits, 0) / totalCredits
+      : 0;
+
+  const currentTermEnrollments = enrollments.filter((e) => e.section.term.isCurrent);
+  const currentAttendanceRates = currentTermEnrollments.map((e) => attendance[e.id]?.rate ?? 0);
+  const overallAttendanceRate =
+    currentAttendanceRates.length > 0
+      ? Math.round(currentAttendanceRates.reduce((a, b) => a + b, 0) / currentAttendanceRates.length)
+      : 0;
+
+  const completedCredits = enrollments
+    .filter((e) => e.status !== "active" && e.finalGrade)
+    .reduce((s, e) => s + e.section.course.credits, 0);
+
+  // GPA trend: average gpaPoints weighted by credits, grouped by term.
+  const gpaByTerm = new Map<string, { label: string; startDate: string; weighted: number; credits: number }>();
+  for (const e of graded) {
+    const term = e.section.term;
+    const entry = gpaByTerm.get(term.id) ?? { label: term.label, startDate: term.startDate, weighted: 0, credits: 0 };
+    entry.weighted += Number(e.finalGrade!.gpaPoints) * e.section.course.credits;
+    entry.credits += e.section.course.credits;
+    gpaByTerm.set(term.id, entry);
+  }
+  const gpaTrend = Array.from(gpaByTerm.values())
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
+    .map((t) => ({ name: t.label, gpa: t.credits > 0 ? Math.round((t.weighted / t.credits) * 100) / 100 : 0 }));
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
-      {/* Welcome Banner */}
-      <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/10 via-card to-background p-6 md:p-8 shadow-sm">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="space-y-2">
-            <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-              <IconCircleCheck className="size-3.5" />
-              <span>Academic Standing: Normal / Low Risk</span>
-            </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight">
-              Welcome back to your Academic Portal
-            </h1>
-            <p className="text-sm text-muted-foreground max-w-2xl">
-              Spring Term 2026 • Bachelor of Science in Computer Science • Semester 6
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 bg-background/80 backdrop-blur px-4 py-2 rounded-xl border text-xs font-medium text-muted-foreground shadow-sm">
-              <IconClock className="size-4 text-primary" />
-              <span>30-min Inactive Session Timeout Active</span>
-            </div>
-          </div>
-        </div>
+    <div className="flex flex-col gap-10">
+      <div className="flex flex-col gap-2">
+        <h2 className="text-4xl font-bold tracking-tight leading-none">
+          Welcome back, {session!.user.name.split(" ")[0]}.
+        </h2>
+        <p className="text-muted-foreground font-mono text-xs uppercase tracking-widest">
+          Student ID: {student.studentNumber} — {student.program.name} — {student.program.department.name}
+        </p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Cumulative GPA
-            </CardTitle>
-            <div className="p-2 rounded-lg bg-primary/10 text-primary">
-              <IconAward className="size-4" />
-            </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="bg-accent/5 shadow-none border-none">
+          <CardHeader>
+            <CardDescription className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <IconTrendingUp size={14} /> Current GPA
+            </CardDescription>
+            <CardTitle className="text-4xl font-bold font-mono tracking-tighter">{gpa.toFixed(2)}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black">3.68</div>
-            <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium mt-1">
-              <IconTrendingUp className="size-3.5" />
-              <span>+0.12 from last semester</span>
-            </div>
+            <Progress value={(gpa / 4) * 100} className="h-1" />
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Term Attendance
-            </CardTitle>
-            <div className="p-2 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
-              <IconCalendar className="size-4" />
-            </div>
+        <Card className="bg-accent/5 shadow-none border-none">
+          <CardHeader>
+            <CardDescription className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <IconCalendar size={14} /> Attendance (Current Term)
+            </CardDescription>
+            <CardTitle className="text-4xl font-bold font-mono tracking-tighter">{overallAttendanceRate}%</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-black">92.5%</div>
-            <p className="text-xs text-muted-foreground mt-1">37 / 40 sessions attended</p>
+            <Progress value={overallAttendanceRate} className="h-1" />
           </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Enrolled Credits
-            </CardTitle>
-            <div className="p-2 rounded-lg bg-violet-500/10 text-violet-600 dark:text-violet-400">
-              <IconBook className="size-4" />
-            </div>
+        <Card className="bg-accent/5 shadow-none border-none">
+          <CardHeader>
+            <CardDescription className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <IconCreditCard size={14} /> Credits Completed
+            </CardDescription>
+            <CardTitle className="text-4xl font-bold font-mono tracking-tighter">{completedCredits}</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black">14 hrs</div>
-            <p className="text-xs text-muted-foreground mt-1">4 core courses in progress</p>
-          </CardContent>
         </Card>
 
-        <Card className="hover:shadow-md transition-shadow">
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              Predicted Risk
-            </CardTitle>
-            <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <IconSparkles className="size-4" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-black text-emerald-600 dark:text-emerald-400">Low Risk</div>
-            <p className="text-xs text-muted-foreground mt-1">Confidence score: 94.2%</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Courses & Recommendations Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Active Enrolled Courses */}
-        <div className="lg:col-span-2 space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-lg font-bold">Current Courses & Grades</CardTitle>
-                <CardDescription>Academic progress for Spring 2026 semester</CardDescription>
-              </div>
-              <Badge variant="outline" className="font-semibold text-xs">
-                4 Active
+        <Card className="bg-accent/5 shadow-none border-none">
+          <CardHeader>
+            <CardDescription className="flex items-center gap-2 text-xs font-bold uppercase tracking-widest text-muted-foreground">
+              <IconMicroscope size={14} /> Standing
+            </CardDescription>
+            <div className="pt-2">
+              <Badge variant="secondary" className="font-bold text-xs uppercase tracking-widest px-3 py-1">
+                {standingFor(gpa)}
               </Badge>
+            </div>
+          </CardHeader>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>Academic Trajectory</CardTitle>
+            <CardDescription className="font-mono text-[10px] uppercase tracking-widest">
+              Semester-over-semester GPA
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="h-[300px] w-full px-6 pb-6">
+            <GpaTrendChart data={gpaTrend} />
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-6">
+          <Card className="bg-primary text-primary-foreground border-none">
+            <CardHeader className="pb-6">
+              <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2 text-primary-foreground">
+                <IconSparkles size={16} className="text-primary-foreground/80" /> Risk Assessment
+              </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {currentCourses.map((course) => (
-                <div
-                  key={course.code}
-                  className="p-4 rounded-xl border bg-card/50 hover:bg-accent/5 transition-colors space-y-3"
-                >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <CardContent className="flex flex-col gap-4">
+              {latestRisk ? (
+                <>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-primary-foreground/60 tracking-widest mb-1">
+                      Risk Level
+                    </p>
+                    <p className="text-3xl font-bold tracking-tighter capitalize">
+                      {latestRisk.riskLevel.replace("_", " ")}
+                    </p>
+                  </div>
+                  {latestRisk.predictedFinalGrade && (
                     <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-md bg-secondary text-secondary-foreground">
-                          {course.code}
-                        </span>
-                        <h3 className="text-sm font-bold text-foreground">{course.name}</h3>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Instructor: {course.instructor} • {course.credits} Credits
+                      <p className="text-[10px] uppercase font-bold text-primary-foreground/60 tracking-widest mb-1">
+                        Predicted GPA
                       </p>
+                      <p className="text-2xl font-bold font-mono">{Number(latestRisk.predictedFinalGrade).toFixed(2)}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className="text-xs text-muted-foreground block">Grade</span>
-                        <span className="text-base font-extrabold text-foreground">{course.grade}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-xs text-muted-foreground block">Attendance</span>
-                        <span className="text-base font-extrabold text-foreground">{course.attendance}%</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Term Progress</span>
-                      <span>{course.nextAssessment}</span>
-                    </div>
-                    <Progress value={course.attendance} className="h-1.5" />
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* AI Recommendations & Alerts */}
-        <div className="space-y-6">
-          <Card className="border-primary/20 bg-gradient-to-b from-primary/5 to-card">
-            <CardHeader>
-              <div className="flex items-center gap-2 text-primary font-bold text-sm">
-                <IconSparkles className="size-4" />
-                <span>Predictive Insights</span>
-              </div>
-              <CardTitle className="text-base">AI Academic Advisor</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {recentRecommendations.map((rec, i) => (
-                <div key={i} className="p-3.5 rounded-xl border bg-background/80 space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-foreground">{rec.title}</span>
-                    <Badge variant={rec.severity === "medium" ? "secondary" : "outline"} className="text-[10px]">
-                      {rec.source}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-muted-foreground leading-relaxed">{rec.message}</p>
-                </div>
-              ))}
+                  )}
+                </>
+              ) : (
+                <p className="text-xs text-primary-foreground/60">
+                  No prediction has been generated yet. Predictions run after the first ML model deployment.
+                </p>
+              )}
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Upcoming Deadlines</CardTitle>
-              <CardDescription>Assessments scheduled for this week</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex items-start gap-3 text-xs p-2.5 rounded-lg border bg-accent/5">
-                <IconClock className="size-4 text-amber-500 mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-semibold text-foreground">Kernel Lab 3 (CS303)</p>
-                  <p className="text-muted-foreground">Due Friday, 11:59 PM</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3 text-xs p-2.5 rounded-lg border bg-accent/5">
-                <IconAlertCircle className="size-4 text-primary mt-0.5 shrink-0" />
-                <div>
-                  <p className="font-semibold text-foreground">Midterm Exam (CS301)</p>
-                  <p className="text-muted-foreground">Monday, 09:00 AM • Room 302</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {activeAlerts.length > 0 && (
+            <Card className="bg-destructive/10 border-none">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xs font-bold flex items-center gap-2 text-destructive uppercase tracking-widest">
+                  <IconAlertTriangle size={14} /> Active Alerts
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pb-6">
+                <ul className="flex flex-col gap-2">
+                  {activeAlerts.slice(0, 3).map((a) => (
+                    <li key={a.id} className="text-xs text-destructive/80 font-bold flex gap-2">
+                      <span className="text-destructive">!!</span> {a.message}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
+
+      <Card>
+        <CardHeader className="border-b px-6 py-6">
+          <CardTitle>Curriculum Performance</CardTitle>
+          <CardDescription>Individual course benchmarks and engagement — current term</CardDescription>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="font-bold uppercase tracking-widest pl-6">Course</TableHead>
+                <TableHead className="font-bold uppercase tracking-widest">Attendance</TableHead>
+                <TableHead className="font-bold uppercase tracking-widest text-right pr-6">Grade</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {currentTermEnrollments.map((e) => {
+                const rate = attendance[e.id]?.rate ?? 0;
+                return (
+                  <TableRow key={e.id}>
+                    <TableCell className="pl-6">
+                      <div className="flex flex-col">
+                        <span className="font-bold text-sm tracking-tight">{e.section.course.name}</span>
+                        <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                          {e.section.course.code} Sec. {e.section.sectionCode} — {e.section.course.credits} Credits
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <span className={cn("text-xs font-bold font-mono", rate < 90 ? "text-destructive" : "text-primary")}>
+                          {rate}%
+                        </span>
+                        <Progress value={rate} className="h-1 w-16" />
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right pr-6">
+                      <div className="inline-flex size-8 rounded-lg bg-accent/10 border items-center justify-center font-bold font-mono text-xs">
+                        {e.finalGrade?.letterGrade ?? "—"}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
     </div>
   );
 }

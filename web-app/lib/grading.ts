@@ -1,81 +1,62 @@
+// Single source of truth for turning raw grade_entries into a weighted
+// total / letter grade / GPA points — used by both the seed script and the
+// real grade-entry route handler so seeded data and live data are computed
+// identically.
+
 export interface ScoredComponent {
   weightPct: number;
   maxScore: number;
-  score: number;
+  score: number; // most recent (non-superseded) score for this component
 }
 
 export interface FinalGradeResult {
-  weightedTotal: number;
+  weightedTotal: number; // 0-100
   letterGrade: string;
-  gpaPoints: number;
+  gpaPoints: number; // 0.0-4.0
+}
+
+const GRADE_SCALE: { min: number; letter: string; points: number }[] = [
+  { min: 93, letter: "A", points: 4.0 },
+  { min: 90, letter: "A-", points: 3.7 },
+  { min: 87, letter: "B+", points: 3.3 },
+  { min: 83, letter: "B", points: 3.0 },
+  { min: 80, letter: "B-", points: 2.7 },
+  { min: 77, letter: "C+", points: 2.3 },
+  { min: 73, letter: "C", points: 2.0 },
+  { min: 70, letter: "C-", points: 1.7 },
+  { min: 67, letter: "D+", points: 1.3 },
+  { min: 60, letter: "D", points: 1.0 },
+  { min: 0, letter: "F", points: 0.0 },
+];
+
+export function scoreToLetterAndPoints(percent: number): { letter: string; points: number } {
+  const row = GRADE_SCALE.find((r) => percent >= r.min) ?? GRADE_SCALE[GRADE_SCALE.length - 1];
+  return { letter: row.letter, points: row.points };
 }
 
 /**
- * Computes the weighted percentage, letter grade, and GPA points
- * for an array of graded assessment components.
- * Returns null if no components are scored.
+ * Weighted total is normalized against the sum of weights actually graded
+ * so far (not all assessmentComponents for the section) — this lets
+ * mid-semester grades be meaningful before every component has a score,
+ * matching S-12's "predicted final grade where sufficient data exists".
  */
-export function computeFinalGrade(scored: ScoredComponent[]): FinalGradeResult | null {
-  if (!scored || scored.length === 0) {
-    return null;
-  }
+export function computeFinalGrade(components: ScoredComponent[]): FinalGradeResult | null {
+  if (components.length === 0) return null;
 
-  let totalWeight = 0;
-  let earnedWeight = 0;
+  const totalWeight = components.reduce((sum, c) => sum + c.weightPct, 0);
+  if (totalWeight === 0) return null;
 
-  for (const item of scored) {
-    if (item.maxScore <= 0 || item.weightPct <= 0) continue;
-    const ratio = Math.max(0, Math.min(item.score / item.maxScore, 1.5));
-    earnedWeight += ratio * item.weightPct;
-    totalWeight += item.weightPct;
-  }
+  const weightedSum = components.reduce((sum, c) => {
+    const pct = (c.score / c.maxScore) * 100;
+    return sum + pct * c.weightPct;
+  }, 0);
 
-  if (totalWeight === 0) {
-    return null;
-  }
-
-  // Normalize to 100% scale if total weight evaluated so far is less than or equals 100
-  const percentage = (earnedWeight / totalWeight) * 100;
-  const weightedTotal = Math.round(percentage * 100) / 100;
-
-  let letterGrade: string;
-  let gpaPoints: number;
-
-  if (weightedTotal >= 90) {
-    letterGrade = "A";
-    gpaPoints = 4.0;
-  } else if (weightedTotal >= 85) {
-    letterGrade = "A-";
-    gpaPoints = 3.7;
-  } else if (weightedTotal >= 80) {
-    letterGrade = "B+";
-    gpaPoints = 3.3;
-  } else if (weightedTotal >= 75) {
-    letterGrade = "B";
-    gpaPoints = 3.0;
-  } else if (weightedTotal >= 70) {
-    letterGrade = "B-";
-    gpaPoints = 2.7;
-  } else if (weightedTotal >= 65) {
-    letterGrade = "C+";
-    gpaPoints = 2.3;
-  } else if (weightedTotal >= 60) {
-    letterGrade = "C";
-    gpaPoints = 2.0;
-  } else if (weightedTotal >= 55) {
-    letterGrade = "C-";
-    gpaPoints = 1.7;
-  } else if (weightedTotal >= 50) {
-    letterGrade = "D";
-    gpaPoints = 1.0;
-  } else {
-    letterGrade = "F";
-    gpaPoints = 0.0;
-  }
+  const weightedTotal = weightedSum / totalWeight;
+  const { letter, points } = scoreToLetterAndPoints(weightedTotal);
 
   return {
-    weightedTotal,
-    letterGrade,
-    gpaPoints,
+    weightedTotal: Math.round(weightedTotal * 100) / 100,
+    letterGrade: letter,
+    gpaPoints: points,
   };
 }
