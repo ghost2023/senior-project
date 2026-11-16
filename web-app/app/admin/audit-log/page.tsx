@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,7 +35,7 @@ export default async function AdminAuditLogPage({ searchParams }: { searchParams
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((r) => (
+              {rows.map((r: any) => (
                 <TableRow key={r.id}>
                   <TableCell className="pl-6 text-xs font-bold">
                     {r.actorName}

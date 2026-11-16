@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
-import { markAttendanceAction } from "./actions";
+import { backendMutation } from "@/lib/backend-client";
 
 type Status = "present" | "absent" | "late" | "excused";
 const STATUSES: Status[] = ["present", "absent", "late", "excused"];
@@ -36,7 +36,7 @@ export function AttendanceGrid({
 
   function handleSave() {
     startTransition(async () => {
-      await markAttendanceAction({
+      await backendMutation("/attendance", {
         sectionId,
         sessionDate,
         marks: rows.map((r) => ({ enrollmentId: r.enrollmentId, status: statuses[r.enrollmentId] })),

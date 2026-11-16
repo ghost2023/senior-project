@@ -4,7 +4,7 @@ import { useMemo, useState, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { saveGradesAction } from "./actions";
+import { backendMutation } from "@/lib/backend-client";
 
 export interface GradeGridComponent {
   id: string;
@@ -75,7 +75,7 @@ export function GradeGrid({
       ),
     };
     startTransition(async () => {
-      await saveGradesAction(payload);
+      await backendMutation("/grades", payload);
       setSavedMessage("Saved.");
     });
   }

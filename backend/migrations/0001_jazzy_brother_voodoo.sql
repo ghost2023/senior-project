@@ -1,0 +1,1 @@
+ALTER TABLE "attendance_records" DROP CONSTRAINT "attendance_records_enrollment_id_session_date_unique";

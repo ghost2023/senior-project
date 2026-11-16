@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { updateThresholdAction } from "./actions";
+import { backendMutation } from "@/lib/backend-client";
 
 export interface ThresholdRow {
   id: string;
@@ -25,7 +25,7 @@ export function ThresholdForm({ threshold }: { threshold: ThresholdRow }) {
     const pct = Number(value);
     if (Number.isNaN(pct) || pct < 0 || pct > 100) return;
     startTransition(async () => {
-      await updateThresholdAction({ id: threshold.id, minScore: pct / 100 });
+      await backendMutation("/threshold", { id: threshold.id, minScore: pct / 100 });
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     });

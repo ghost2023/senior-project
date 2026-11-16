@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { IconShieldCheckered } from "@tabler/icons-react";
@@ -57,7 +58,7 @@ export default async function TeacherRisksPage() {
                           {r.riskLevel.replace("_", " ")}
                         </Badge>
                         <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-mono">
-                          {r.sections.map((s) => `${s.course.code} Sec. ${s.sectionCode}`).join(", ")}
+                          {r.sections.map((s: any) => `${s.course.code} Sec. ${s.sectionCode}`).join(", ")}
                         </span>
                       </div>
                       <CardTitle className="text-base">{r.student.user.name}</CardTitle>

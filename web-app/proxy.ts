@@ -3,10 +3,8 @@ import { NextResponse, type NextRequest } from "next/server";
 
 // Next.js 16 renamed `middleware.ts`/`middleware()` to `proxy.ts`/`proxy()`.
 //
-// This is only a coarse, optimistic check (cookie presence, not a verified
-// DB session — proxy runs on every request and can't afford a DB round
-// trip). The authoritative check is requireRole() in each role route
-// group's layout.tsx, which calls auth.api.getSession() server-side.
+// This is only a coarse, optimistic cookie check. The authoritative role
+// check happens in the route layouts through the Express session API.
 const PROTECTED_PREFIXES = ["/student", "/teacher", "/admin"];
 
 export function proxy(request: NextRequest) {

@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { Button } from "@/components/ui/button";
-import { acknowledgeAlertAction } from "./actions";
+import { backendMutation } from "@/lib/backend-client";
 
 export function AcknowledgeButton({ alertId }: { alertId: string }) {
   const [isPending, startTransition] = useTransition();
@@ -11,7 +11,7 @@ export function AcknowledgeButton({ alertId }: { alertId: string }) {
       size="sm"
       variant="outline"
       disabled={isPending}
-      onClick={() => startTransition(() => acknowledgeAlertAction(alertId))}
+      onClick={() => startTransition(() => backendMutation("/acknowledge-alert", { alertId }))}
     >
       {isPending ? "Acknowledging..." : "Acknowledge"}
     </Button>

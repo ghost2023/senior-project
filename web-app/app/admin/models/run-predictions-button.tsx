@@ -13,7 +13,7 @@ export function RunPredictionsButton() {
     setStatus("running");
     setError(null);
     try {
-      const res = await fetch("/api/predictions/run", { method: "POST" });
+      const res = await fetch("/api/backend/predictions/run", { method: "POST" });
       const body = await res.json();
       if (!res.ok) throw new Error(body.error ?? "Prediction run failed");
       setStatus("idle");

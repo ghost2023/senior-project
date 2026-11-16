@@ -3,7 +3,7 @@
 import { useRef, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { addNoteAction } from "./actions";
+import { backendMutation } from "@/lib/backend-client";
 
 export function NoteForm({ studentId, sectionId }: { studentId: string; sectionId: string | null }) {
   const [isPending, startTransition] = useTransition();
@@ -17,7 +17,7 @@ export function NoteForm({ studentId, sectionId }: { studentId: string; sectionI
         const note = inputRef.current?.value.trim();
         if (!note) return;
         startTransition(async () => {
-          await addNoteAction({ studentId, sectionId, note });
+          await backendMutation("/teacher-note", { studentId, sectionId, note });
           if (inputRef.current) inputRef.current.value = "";
         });
       }}

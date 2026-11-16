@@ -1,9 +1,6 @@
-import { inArray } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { db } from "@/lib/db";
-import { finalGrades } from "@/lib/db/schema";
 import { getSession } from "@/lib/permissions";
-import { getSectionRoster, getTeacherByUserId, getTeacherSections } from "@/lib/queries/teacher";
+import { getSectionFinalGrades, getSectionRoster, getTeacherByUserId, getTeacherSections } from "@/lib/queries/teacher";
 import { mean, median, stddev } from "@/lib/stats";
 import { SectionComparisonChart } from "./comparison-chart";
 
@@ -21,7 +18,7 @@ export default async function TeacherAnalyticsPage() {
       const enrollmentIds = roster.map((r) => r.id);
       const grades =
         enrollmentIds.length > 0
-          ? await db.select().from(finalGrades).where(inArray(finalGrades.enrollmentId, enrollmentIds))
+          ? await getSectionFinalGrades(enrollmentIds)
           : [];
       const totals = grades.map((g) => Number(g.weightedTotal ?? 0)).filter((v) => v > 0);
       return {

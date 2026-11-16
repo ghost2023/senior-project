@@ -1,11 +1,9 @@
-import { desc } from "drizzle-orm";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { db } from "@/lib/db";
-import { alertThresholds } from "@/lib/db/schema";
+import { getAlertThresholds } from "@/lib/queries/admin";
 import { ThresholdForm } from "./threshold-form";
 
 export default async function AdminAlertConfigPage() {
-  const thresholds = await db.select().from(alertThresholds).orderBy(desc(alertThresholds.riskLevel));
+  const thresholds = await getAlertThresholds();
 
   return (
     <div className="flex flex-col gap-8">
